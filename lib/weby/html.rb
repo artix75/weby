@@ -7,7 +7,12 @@ module Weby
 
         attr_accessor :node, :nodeset, :document
 
+        @@prefix = 'wby'
+        @@evaluation_instance = nil
+        @@evaluation_binding = TOPLEVEL_BINDING
+
         def initialize(obj, opts = {}, &block)
+            @source = opts[:source]
             if obj.is_a? Nokogiri::XML::Node
                 @node = obj
                 @is_doc = obj.is_a? Nokogiri::XML::Document
@@ -19,12 +24,11 @@ module Weby
                 @node = obj[0]
             elsif obj.is_a? Symbol
                 @document = opts[:_doc] 
-                raise HTMLException, ':_doc option is missing' if !@document
+                raise_err ':_doc option is missing' if !@document
                 @document = @document.document if @document.is_a?(HTML)
                 if !@document.is_a?(Nokogiri::XML::DocumentFragment) && 
                    !@document.is_a?(Nokogiri::XML::Document)
-                    raise HTMLException, 
-                          ':_doc must be Nokogiri::XML::Document(Fragment)'
+                    raise_err ':_doc must be Nokogiri::XML::Document[Fragment]'
                 end
                 @node = Nokogiri::XML::Element.new obj.to_s, @document
                 opts.delete :_doc
@@ -34,7 +38,12 @@ module Weby
                 }
                 self.exec(&block) if block_given?
             elsif obj.is_a? String
-                @node = Nokogiri::HTML::DocumentFragment.parse obj
+                if @source && @source[/\.rb$/]
+                    @node = Nokogiri::HTML::DocumentFragment.parse '' 
+                    self.exec :append, obj
+                else
+                    @node = Nokogiri::HTML::DocumentFragment.parse obj
+                end
                 @document = @node
                 @is_fragm = true
             end
@@ -45,10 +54,52 @@ module Weby
             @builder ||= HTMLBuilder.new(self)
         end
 
-        def exec(mode = :append, &block)
-            text = builder.mode(mode).instance_eval(&block)
+        def exec(mode = :append, src = nil, &block)
+            if src
+                text = builder.mode(mode).instance_eval(src)
+            else
+                text = builder.mode(mode).instance_eval(&block)
+            end
             @node.add_child text if text.is_a? String
             text
+        end
+
+        def evaluate(opts = {})
+            return if !@node
+            _self = opts[:self] || @@evaluation_instance
+            _binding = opts[:binding] || @@evaluation_binding
+            conditional_attr = "#{@@prefix}-if"
+            conditionals = @node.css "*[#{conditional_attr}]"
+            conditionals.each{|n|
+                condition = n[conditional_attr]
+                args = [condition]
+                args += [@source, n.line] if @source
+                if _self
+                    ok = _self.instance_eval *args
+                else
+                    ok = _binding.eval *args
+                end
+                if !ok
+                    n.remove
+                else
+                    n.remove_attribute conditional_attr
+                end
+            }
+            imports = @node.css "#{@@prefix}-import"
+            imports.each{|n|
+                path = n['path'] 
+                if path
+                    if !File.exists? path
+                        line = (@source ? n.line : nil)
+                        raise_err "File not found: #{path}", line
+                    end
+                    fragm = HTML::load path
+                    next if !fragm.node
+                    fragm.evaluate self: _self, binding: _binding
+                    n.after fragm.node
+                    n.remove
+                end
+            }
         end
 
         def append(_node = nil, &block)
@@ -143,7 +194,7 @@ module Weby
             if @node
                 if obj.is_a? String
                     @node.content = obj
-                elsif obj.is_a? Hash
+                elsif hashlike?(obj)
                     obj.each{|attr, v|
                         attr_s = attr.to_s
                         if v.nil? && !@node[attr_s].nil?
@@ -151,11 +202,11 @@ module Weby
                         elsif attr == :content
                             v = '' if v.nil?
                             @node.content = v.to_s
-                        elsif attr == :data && v.is_a?(Hash)
+                        elsif attr == :data && hashlike?(v)
                             v.each{|data_name, data_val|
                                 @node["data-#{data_name}"] = data_val 
                             }                            
-                        elsif attr == :select && v.is_a?(Hash)
+                        elsif attr == :select && hashlike?(v)
                             v.each{|sel, o|
                                 e = self.find sel.to_s
                                 e.as_template(o)
@@ -195,24 +246,46 @@ module Weby
             end
         end
 
-        def HTML::parse_doc(text)
-            HTML::parse text, is_document: true
+        def HTML::parse_doc(text, opts = {})
+            opts[:is_document] = true
+            HTML::parse text, opts
         end
 
         def HTML::load(path, opts = {})
+            opts[:source] = path
             text = File.read path
             HTML::parse text, opts
         end
 
         def HTML::load_doc(path)
-            HTML::load path, is_document: true
+            HTML::load path, is_document: true, source: path
+        end
+
+        def HTML::prefix=(prfx)
+            @@prefix = prfx
+        end
+
+        def HTML::evaluation_instance=(obj)
+            @@evaluation_instance = obj
+        end
+
+        def HTML::evaluation_binding=(b)
+            @@evaluation_binding = b
         end
         
         private
 
+        def raise_err(msg, line = nil)
+            args = [HTMLException, msg]
+            args << "#{@source}:#{line}" if @source && line
+            raise *args
+        end
+
         def add_class_to(_node, classname)
             cls = _node['class'] || ''
-            cls = (cls.split(/\s+/) << classname).join(' ')
+            classes = cls.split(/\s+/)
+            return if classes.include? classname
+            cls = (classes << classname).join(' ')
             _node['class'] = cls
         end
 
@@ -220,6 +293,12 @@ module Weby
             cls = _node['class'] || ''
             cls = cls.split(/\s+/).select{|c| c != classname}.join(' ')
             _node['class'] = cls
+        end
+
+        def hashlike?(obj) 
+            obj.is_a?(Hash) || (!obj.is_a?(Array) && 
+                                obj.respond_to?(:[]) && 
+                                obj.respond_to?(:each))
         end
 
     end
