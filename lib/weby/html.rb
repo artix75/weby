@@ -10,6 +10,8 @@ module Weby
         @@prefix = 'wby'
         @@evaluation_instance = nil
         @@evaluation_binding = TOPLEVEL_BINDING
+        @@use_cache = true
+        @@cache = {}
 
         def initialize(obj, opts = {}, &block)
             @source = opts[:source]
@@ -48,6 +50,9 @@ module Weby
                 @is_fragm = true
             end
             @document ||= (@nodeset || @node).document
+            if @@use_cache && @source
+                @@cache[@source] = self if !@@cache.key?(@source)
+            end
         end
 
         def builder
@@ -238,6 +243,16 @@ module Weby
             @node.to_html
         end
 
+        def clone
+            _clone = super
+            _clone.instance_eval{
+                @node = @node.clone if @node
+                @nodeset = @nodeset.clone if @nodeset
+                @document = @document.clone if @document
+            }
+            _clone
+        end
+
         def HTML::parse(text, opts = {})
             if opts[:is_document]
                 HTML.new(Nokogiri::HTML::Document.parse(text))
@@ -252,6 +267,10 @@ module Weby
         end
 
         def HTML::load(path, opts = {})
+            if @@use_cache
+                cached = @@cache[path]
+                return cached.clone if cached
+            end
             opts[:source] = path
             text = File.read path
             HTML::parse text, opts
