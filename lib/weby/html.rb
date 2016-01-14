@@ -12,6 +12,7 @@ module Weby
         @@evaluation_binding = TOPLEVEL_BINDING
         @@use_cache = true
         @@cache = {}
+        @@include_path = nil
 
         def initialize(obj, opts = {}, &block)
             @source = opts[:source]
@@ -90,10 +91,11 @@ module Weby
                     n.remove_attribute conditional_attr
                 end
             }
-            imports = @node.css "#{@@prefix}-import"
+            imports = @node.css "#{@@prefix}-include"
             imports.each{|n|
                 path = n['path'] 
                 if path
+                    path = resolvepath path
                     if !File.exists? path
                         line = (@source ? n.line : nil)
                         raise_err "File not found: #{path}", line
@@ -280,16 +282,36 @@ module Weby
             HTML::load path, is_document: true, source: path
         end
 
+        def HTML::prefix
+            @@prefix
+        end
+
         def HTML::prefix=(prfx)
             @@prefix = prfx
+        end
+
+        def HTML::evaluation_instance
+            @@evaluation_instance
         end
 
         def HTML::evaluation_instance=(obj)
             @@evaluation_instance = obj
         end
 
+        def HTML::evaluation_binding
+            @@evaluation_binding
+        end
+
         def HTML::evaluation_binding=(b)
             @@evaluation_binding = b
+        end
+
+        def HTML::include_path
+            @@include_path
+        end
+
+        def HTML::include_path=(path)
+            @@include_path = path
         end
         
         private
@@ -318,6 +340,16 @@ module Weby
             obj.is_a?(Hash) || (!obj.is_a?(Array) && 
                                 obj.respond_to?(:[]) && 
                                 obj.respond_to?(:each))
+        end
+
+        def resolvepath(path)
+            return path if path[/^\//]
+            if (include_path = @@include_path)
+                script_path = File.dirname(File.expand_path($0))
+                include_path = File.join(script_path, include_path, path)
+                path = include_path if File.exists? path 
+            end
+            path
         end
 
     end
