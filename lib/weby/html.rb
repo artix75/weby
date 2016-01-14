@@ -209,7 +209,7 @@ module Weby
                         hash[prop] = val
                     }
                     @node['style'] = hash_to_css(hash)
-                    return hash
+                    return self
                 else
                     return hash[arg.to_s]
                 end
@@ -217,8 +217,18 @@ module Weby
                 prop, val = args
                 hash[prop] = val
                 @node['style'] = hash_to_css(hash)
-                return hash
+                return self
             end
+        end
+
+        def hide
+            (@nodeset || [@node]).each{|n|
+                css = n['style'] || ''
+                hash = parse_css css
+                hash['display'] = 'none'
+                n['style'] = hash_to_css(hash)
+            }
+            self
         end
 
         def as_template(obj)
