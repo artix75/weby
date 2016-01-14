@@ -196,6 +196,31 @@ module Weby
             self
         end
 
+        def style(*args)
+            return {} if !@node
+            argl = args.length
+            css = @node['style'] || ''
+            hash = parse_css css
+            return hash if argl.zero?
+            if argl == 1
+                arg = args[0]
+                if hashlike? arg
+                    arg.each{|prop, val|
+                        hash[prop] = val
+                    }
+                    @node['style'] = hash_to_css(hash)
+                    return hash
+                else
+                    return hash[arg.to_s]
+                end
+            else
+                prop, val = args
+                hash[prop] = val
+                @node['style'] = hash_to_css(hash)
+                return hash
+            end
+        end
+
         def as_template(obj)
             res = self
             if @node
@@ -350,6 +375,24 @@ module Weby
                 path = include_path if File.exists? path 
             end
             path
+        end
+
+        def parse_css(css)
+            o = {}
+            css = css.strip.gsub(/^\{/, '').gsub(/\}$/, '')
+            decls = css.split(';')
+            decls.each{|d|
+                prop, val = d.strip.split(':')
+                o[prop.strip] = val.strip
+            }
+            o
+        end
+
+        def hash_to_css(hash)
+            hash.to_a.map{|d|
+                prop, val = d
+                "#{prop}: #{val}"
+            }.join('; ')
         end
 
     end
