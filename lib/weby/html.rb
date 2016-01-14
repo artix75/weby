@@ -197,14 +197,15 @@ module Weby
         end
 
         def style(*args)
-            return {} if !@node
             argl = args.length
-            css = @node['style'] || ''
+            _node = @node || {}
+            css = (_node['style']) || ''
             hash = parse_css css
             return hash if argl.zero?
             if argl == 1
                 arg = args[0]
                 if hashlike? arg
+                    return if !@node
                     arg.each{|prop, val|
                         hash[prop] = val
                     }
@@ -229,6 +230,36 @@ module Weby
                 n['style'] = hash_to_css(hash)
             }
             self
+        end
+
+        def data(*args)
+            argl = args.length
+            if argl.zero?
+                return {} if !@node
+                attrs = @node.attributes
+                res = {}
+                attrs.each{|a,v|
+                    res[a] = v if a[/^data-/]
+                }
+                res
+            elsif argl == 1
+                arg = args[0]
+                if hashlike?(arg)
+                    arg.each{|name, val|
+                        @node["data-#{name}"] = val
+                    } if @node
+                    self
+                else
+                   return nil if !@node
+                   @node["data-#{arg}"]
+                end
+            else
+                name, val = args
+                if @node
+                    @node["data-#{name}"] = val
+                end
+                self
+            end
         end
 
         def as_template(obj)
