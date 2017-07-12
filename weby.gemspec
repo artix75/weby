@@ -12,7 +12,7 @@ Gem::Specification.new do |spec|
   spec.summary       = %q{Web programming for Ruby made easy.}
   spec.description   = File.read(File.join(lpath, 'GEMDESC'))
   spec.homepage      = "https://github.com/artix75/weby"
-  spec.license       = "BSD"
+  spec.license       = "BSD-3-Clause"
 
   spec.files         = `git ls-files -z`.split("\x0")
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
