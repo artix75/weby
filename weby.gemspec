@@ -11,8 +11,8 @@ Gem::Specification.new do |spec|
   spec.email         = ["artix2@gmail.com"]
   spec.summary       = %q{Web programming for Ruby made easy.}
   spec.description   = File.read(File.join(lpath, 'GEMDESC'))
-  spec.homepage      = ""
-  spec.license       = "MIT"
+  spec.homepage      = "https://github.com/artix75/weby"
+  spec.license       = "BSD"
 
   spec.files         = `git ls-files -z`.split("\x0")
   spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
