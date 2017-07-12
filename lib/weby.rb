@@ -1,5 +1,6 @@
+require 'nokogiri'
 require "weby/version"
+require "weby/html"
 
 module Weby
-  # Your code goes here...
 end

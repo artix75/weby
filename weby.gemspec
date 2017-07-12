@@ -4,12 +4,13 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'weby/version'
 
 Gem::Specification.new do |spec|
+  lpath = File.dirname(lib)
   spec.name          = "weby"
   spec.version       = Weby::VERSION
   spec.authors       = ["artix"]
   spec.email         = ["artix2@gmail.com"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
+  spec.summary       = %q{Web programming for Ruby made easy.}
+  spec.description   = File.read(File.join(lpath, 'GEMDESC'))
   spec.homepage      = ""
   spec.license       = "MIT"
 
@@ -21,6 +22,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency "bundler", "~> 1.7"
   spec.add_development_dependency "rake", "~> 10.0"
 
-  spec.add_runtime_dependency "nokogiri"
+  spec.add_runtime_dependency "nokogiri", "~> 1.8"
 
 end

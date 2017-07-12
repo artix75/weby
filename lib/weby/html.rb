@@ -262,7 +262,9 @@ module Weby
             end
         end
 
-        def as_template(obj)
+        def as_template(obj, opts = nil)
+            opts ||= {}
+            nl = opts[:new_line]
             res = self
             if @node
                 if obj.is_a? String
@@ -298,6 +300,7 @@ module Weby
                         else
                             e.as_template(o)
                         end
+                        last.after("\n") if nl
                         last.after(e.node)
                         last = e.node
                     }
@@ -311,6 +314,23 @@ module Weby
             @node.to_html
         end
 
+        def to_xhtml
+            @node.to_xhtml
+        end
+
+        def to_xml
+            @node.to_xml
+        end
+
+        def to_s
+            super if !@node
+            if @node.xml?
+                to_xml
+            else
+                to_html
+            end
+        end
+
         def clone
             _clone = super
             _clone.instance_eval{
@@ -321,7 +341,13 @@ module Weby
             _clone
         end
 
-        def HTML::parse(text, opts = {})
+        def HTML::parse(text, opts = nil)
+            text ||= ''
+            opts ||= {}
+            opts = {auto: true}.merge(opts)
+            if opts[:auto]
+                opts[:is_document] = !text.strip[/^<!doctype /i].nil?
+            end
             if opts[:is_document]
                 HTML.new(Nokogiri::HTML::Document.parse(text))
             else
