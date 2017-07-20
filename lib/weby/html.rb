@@ -437,9 +437,12 @@ module Weby
         def resolvepath(path)
             return path if path[/^\//]
             if (include_path = @@include_path)
-                script_path = File.dirname(File.expand_path($0))
-                include_path = File.join(script_path, include_path, path)
-                path = include_path if File.exists? path 
+                if !include_path[/^\//]
+                    script_path = File.dirname(File.expand_path($0))
+                    include_path = File.join(script_path, include_path)
+                end
+                include_path = File.join(include_path, path)
+                path = include_path if File.exists? include_path 
             end
             path
         end
