@@ -7,6 +7,15 @@ module Weby
 
         attr_accessor :node, :nodeset, :document
 
+        %w(ancestors attributes name name= css_path matches?).each{|m|
+            _method = :"#{m}"
+            define_method _method do |*args|
+                if @node
+                    @node.send _method, *args
+                end
+            end
+        }
+
         @@prefix = 'wby'
         @@evaluation_instance = nil
         @@evaluation_binding = TOPLEVEL_BINDING
@@ -149,6 +158,14 @@ module Weby
         end
 
         def each(&block)
+            (@nodeset || [@node]).each{|_node|
+                next if !_node
+                element = self.class.new _node
+                yield element
+            }
+        end
+
+        def each_node(&block)
             (@nodeset || [@node]).each &block 
         end
 
@@ -169,8 +186,24 @@ module Weby
         def []=(attr, val)
             if @node
                 @node[attr] = val
+            elsif @nodeset
+                @nodeset.each{|_node|
+                    _node[attr] = val
+                }
             end
         end
+
+        def text
+            return '' if !@node
+            node.content
+        end
+
+        def text=(txt)
+            @node.content = txt if @node
+        end
+
+        alias_method :content, :text
+        alias_method :content=, :text=
 
         def inner_html
             return '' if !@node
@@ -200,30 +233,44 @@ module Weby
             argl = args.length
             _node = @node || {}
             css = (_node['style']) || ''
-            hash = parse_css css
-            return hash if argl.zero?
+            if argl.zero?
+                hash = parse_css css
+                return hash 
+            end
             if argl == 1
                 arg = args[0]
                 if hashlike? arg
                     return if !@node
-                    arg.each{|prop, val|
-                        hash[prop] = val
+                    (@nodeset || [@node]).each{|n| 
+                        next if !n
+                        css = (n['style']) || ''
+                        hash = parse_css css
+                        arg.each{|prop, val|
+                            hash[prop] = val
+                        }
+                        n['style'] = hash_to_css(hash)
                     }
-                    @node['style'] = hash_to_css(hash)
                     return self
                 else
+                    hash = parse_css css
                     return hash[arg.to_s]
                 end
             else
                 prop, val = args
-                hash[prop] = val
-                @node['style'] = hash_to_css(hash)
+                (@nodeset || [@node]).each{|n| 
+                    next if !n
+                    css = (n['style']) || ''
+                    hash = parse_css css
+                    hash[prop] = val
+                    n['style'] = hash_to_css(hash)
+                }
                 return self
             end
         end
 
         def hide
             (@nodeset || [@node]).each{|n|
+                next if !n
                 css = n['style'] || ''
                 hash = parse_css css
                 hash['display'] = 'none'
@@ -245,9 +292,12 @@ module Weby
             elsif argl == 1
                 arg = args[0]
                 if hashlike?(arg)
-                    arg.each{|name, val|
-                        @node["data-#{name}"] = val
-                    } if @node
+                    (@nodeset || [@node]).each{|n|
+                        next if !n
+                        arg.each{|name, val|
+                            n["data-#{name}"] = val
+                        }
+                    }
                     self
                 else
                    return nil if !@node
@@ -255,9 +305,10 @@ module Weby
                 end
             else
                 name, val = args
-                if @node
-                    @node["data-#{name}"] = val
-                end
+                (@nodeset || [@node]).each{|n|
+                    next if !n
+                    n["data-#{name}"] = val
+                }
                 self
             end
         end
